@@ -45,8 +45,9 @@ export class AuthService {
 
   async login(loginDto: LoginDto) {
     const user = await this.usersService.findByEmail(loginDto.email);
-    if (!user) {
-      throw new UnauthorizedException('Credenciais inválidas.');
+
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Credenciais inválidas ou conta criada via login social.');
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -108,5 +109,35 @@ export class AuthService {
   private async updateRefreshToken(userId: string, refreshToken: string) {
     const hash = await bcrypt.hash(refreshToken, 10);
     await this.usersService.setCurrentRefreshToken(hash, userId);
+  }
+
+  async validateOAuthUser(details: {
+    email: string;
+    name: string;
+    avatarUrl?: string;
+    googleId?: string;
+    githubId?: string;
+  }) {
+    let user = await this.usersService.findByEmail(details.email);
+
+    if (user) {
+      if (details.googleId && !user.googleId) user.googleId = details.googleId;
+      if (details.githubId && !user.githubId) user.githubId = details.githubId;
+      if (details.avatarUrl) user.avatarUrl = details.avatarUrl;
+      await this.usersService.create(user);
+    } else {
+      user = await this.usersService.create({
+        email: details.email,
+        name: details.name,
+        avatarUrl: details.avatarUrl,
+        googleId: details.googleId,
+        githubId: details.githubId,
+      });
+    }
+
+    const tokens = await this.generateTokens(user.id, user.email);
+    await this.updateRefreshToken(user.id, tokens.refreshToken);
+
+    return { user, tokens };
   }
 }

@@ -31,6 +31,14 @@ import { AuthModule } from './auth/auth.module';
         JWT_EXPIRES_IN: Joi.string().default('15m'),
         JWT_REFRESH_SECRET: Joi.string().required(),
         JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
+
+        GOOGLE_CLIENT_ID: Joi.string().optional().allow(''),
+        GOOGLE_CLIENT_SECRET: Joi.string().optional().allow(''),
+        GOOGLE_CALLBACK_URL: Joi.string().default('http://localhost:3001/api/v1/auth/google/callback'),
+
+        GITHUB_CLIENT_ID: Joi.string().optional().allow(''),
+        GITHUB_CLIENT_SECRET: Joi.string().optional().allow(''),
+        GITHUB_CALLBACK_URL: Joi.string().default('http://localhost:3001/api/v1/auth/github/callback'),
       }),
     }),
 

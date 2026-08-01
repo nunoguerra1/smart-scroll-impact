@@ -16,6 +16,7 @@ import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { User } from '../users/entities/user.entity';
+import { AuthGuard } from '@nestjs/passport/dist/auth.guard';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -63,5 +64,44 @@ export class AuthController {
   @ApiOperation({ summary: 'Retorna os dados do perfil logado (com métricas de gamificação)' })
   getProfile(@CurrentUser() user: User) {
     return user;
+  }
+
+  // --- Google OAuth ---
+  @Public()
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Redireciona para o login social do Google' })
+  async googleAuth() { }
+
+  @Public()
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Callback da autenticação do Google' })
+  async googleAuthCallback(@CurrentUser() googleUser: any) {
+    return this.authService.validateOAuthUser({
+      email: googleUser.email,
+      name: googleUser.name,
+      avatarUrl: googleUser.avatarUrl,
+      googleId: googleUser.googleId,
+    });
+  }
+
+  @Public()
+  @Get('github')
+  @UseGuards(AuthGuard('github'))
+  @ApiOperation({ summary: 'Redireciona para o login social do GitHub' })
+  async githubAuth() { }
+
+  @Public()
+  @Get('github/callback')
+  @UseGuards(AuthGuard('github'))
+  @ApiOperation({ summary: 'Callback da autenticação do GitHub' })
+  async githubAuthCallback(@CurrentUser() githubUser: any) {
+    return this.authService.validateOAuthUser({
+      email: githubUser.email,
+      name: githubUser.name,
+      avatarUrl: githubUser.avatarUrl,
+      githubId: githubUser.githubId,
+    });
   }
 }

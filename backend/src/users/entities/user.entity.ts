@@ -20,12 +20,21 @@ export class User {
     @Column({ unique: true, nullable: false })
     email: string;
 
-    @Column({ nullable: false })
+    @Column({ nullable: true })
     @Exclude({ toPlainOnly: true })
-    passwordHash: string;
+    passwordHash?: string;
 
     @Column({ nullable: false })
     name: string;
+
+    @Column({ nullable: true })
+    avatarUrl?: string;
+
+    @Column({ nullable: true, unique: true })
+    googleId?: string;
+
+    @Column({ nullable: true, unique: true })
+    githubId?: string;
 
     @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
     role: UserRole;
@@ -37,7 +46,7 @@ export class User {
     streakCount: number;
 
     @Column({ type: 'timestamp', nullable: true })
-    lastReadAt: Date;
+    lastReadAt?: Date;
 
     @Column({ default: 0 })
     treesPlantedCount: number;
