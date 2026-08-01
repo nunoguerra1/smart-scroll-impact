@@ -1,19 +1,33 @@
+"use client";
+
+import { motion } from "framer-motion";
 import Link from "next/link";
-import { Leaf } from "lucide-react";
 
-export function Navbar() {
+export default function Navbar() {
     return (
-        <nav className="fixed top-0 w-full p-6 flex justify-between items-center z-50">
-            <Link href="/" className="flex items-center gap-2 text-organic-petroleum font-bold text-xl tracking-tighter">
-                <Leaf className="text-organic-impact" />
-                ImpactScroll
-            </Link>
-
-            <div className="flex gap-4">
-                <Link href="/login" className="px-6 py-2 rounded-full border border-organic-petroleum/20 hover:bg-organic-petroleum hover:text-organic-offwhite transition-all duration-300">
-                    Entrar
+        <motion.header
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 1, ease: [0.76, 0, 0.24, 1], delay: 1.5 }}
+            className="fixed top-6 left-0 w-full z-[90] flex justify-center px-4 mix-blend-difference text-[#EBE6DF]"
+        >
+            <nav className="w-full max-w-7xl flex items-center justify-between">
+                <Link href="/" className="flex items-center gap-2 group">
+                    <div className="w-6 h-6 border-2 border-current rounded-full flex items-center justify-center group-hover:bg-[#EBE6DF] group-hover:text-[#1A1A1A] transition-colors">
+                        <span className="text-[10px] font-bold block">IS</span>
+                    </div>
+                    <span className="font-bold tracking-tight text-lg">ImpactScroll</span>
                 </Link>
-            </div>
-        </nav>
+
+                <div className="hidden md:flex items-center gap-8 text-sm uppercase tracking-widest font-medium">
+                    <Link href="#manifesto" className="hover:opacity-50 transition-opacity">Manifesto</Link>
+                    <Link href="#lab" className="hover:opacity-50 transition-opacity">The Lab</Link>
+                </div>
+
+                <button className="text-sm font-bold uppercase tracking-widest border-b border-current pb-1 hover:opacity-50 transition-opacity">
+                    Entrar
+                </button>
+            </nav>
+        </motion.header>
     );
 }

@@ -1,16 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --color-organic-offwhite: #F7F7F5;
-  --color-organic-petroleum: #0D2127;
-  --color-organic-impact: #F47C36;
-
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --color-background: #EBE6DF;
+  --color-foreground: #1A1A1A;
+  --color-accent: #6A1A28;
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    background-color: var(--color-organic-offwhite);
-    color: var(--color-organic-petroleum);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    overflow-x: hidden;
+  }
+
+  ::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-background);
   }
 }
