@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import * as Joi from 'joi';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { WaitlistModule } from './waitlist/waitlist.module';
 
 @Module({
   imports: [
@@ -42,6 +43,8 @@ import { AppService } from './app.service';
         logging: configService.get<string>('NODE_ENV') === 'development',
       }),
     }),
+
+    WaitlistModule,
   ],
   controllers: [AppController],
   providers: [AppService],
