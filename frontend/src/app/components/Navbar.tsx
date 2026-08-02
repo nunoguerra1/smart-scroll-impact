@@ -1,8 +1,15 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { usePathname } from "next/navigation";
 
 export default function Navbar() {
+    const pathname = usePathname();
+
+    if (["/login", "/register", "/feed"].includes(pathname)) {
+        return null;
+    }
+
     const scrollTo = (id: string) => {
         const element = document.getElementById(id);
         if (element) {

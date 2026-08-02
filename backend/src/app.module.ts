@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { GeminiModule } from './gemini/gemini.module';
 import { ContentModule } from './content/content.module';
+import { FeedModule } from './feed/feed.module';
 import { GamificationModule } from './gamification/gamification.module';
 import { BookmarksModule } from './bookmarks/bookmarks.module';
 import { AnalyticsModule } from './analytics/analytics.module';
@@ -66,19 +67,13 @@ import { AnalyticsModule } from './analytics/analytics.module';
     }),
 
     WaitlistModule,
-
     UsersModule,
-
     AuthModule,
-
     GeminiModule,
-
     ContentModule,
-
+    FeedModule,
     GamificationModule,
-
     BookmarksModule,
-
     AnalyticsModule,
   ],
   controllers: [AppController],

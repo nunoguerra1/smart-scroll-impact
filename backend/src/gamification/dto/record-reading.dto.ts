@@ -1,12 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsUUID, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
 
 export class RecordReadingDto {
     @ApiProperty({
         example: 'd3b07384-d113-40e4-a761-123456789abc',
         description: 'ID da pílula de conhecimento lida',
     })
-    @IsUUID()
+    @IsString()
     @IsNotEmpty()
     contentId: string;
 
