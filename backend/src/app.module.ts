@@ -11,6 +11,7 @@ import { GeminiModule } from './gemini/gemini.module';
 import { ContentModule } from './content/content.module';
 import { GamificationModule } from './gamification/gamification.module';
 import { BookmarksModule } from './bookmarks/bookmarks.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -77,6 +78,8 @@ import { BookmarksModule } from './bookmarks/bookmarks.module';
     GamificationModule,
 
     BookmarksModule,
+
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
