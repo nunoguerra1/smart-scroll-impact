@@ -51,6 +51,12 @@ export class Content {
     @Column({ default: 0 })
     viewsCount: number;
 
+    @Column({ type: 'text', nullable: true })
+    embedUrl?: string;
+
+    @Column({ type: 'text', nullable: true })
+    mediaUrl?: string;
+
     @CreateDateColumn()
     createdAt: Date;
 

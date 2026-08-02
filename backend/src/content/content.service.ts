@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Content, ContentCategory } from './entities/content.entity';
+import { Content } from './entities/content.entity';
 import { CreateContentDto } from './dto/create-content.dto';
 import { GetFeedDto } from './dto/get-feed.dto';
 import { GeminiService } from '../gemini/gemini.service';
@@ -32,7 +32,8 @@ export class ContentService {
 
             if (!existing) {
                 this.logger.log(`Tema "${topic}" não encontrado no banco. Gerando via Gemini...`);
-                return [await this.generateAndSaveFromAI(topic)];
+                const newContents = await this.generateAndSaveFromAI(topic);
+                return { items: newContents, total: newContents.length, page, limit };
             }
         }
 
@@ -47,10 +48,10 @@ export class ContentService {
         const [items, total] = await query.getManyAndCount();
 
         if (items.length === 0 && page === 1) {
-            const aiContent = await this.generateAndSaveFromAI(
+            const aiContents = await this.generateAndSaveFromAI(
                 topic || 'Hábitos Saudáveis e Foco',
             );
-            return { items: [aiContent], total: 1, page, limit };
+            return { items: aiContents, total: aiContents.length, page, limit };
         }
 
         return { items, total, page, limit };
@@ -74,24 +75,7 @@ export class ContentService {
         return this.contentRepository.save(content);
     }
 
-    private async generateAndSaveFromAI(topic: string): Promise<Content> {
-        const aiData = await this.geminiService.generateMicroLearningContent(topic);
-
-        let category = ContentCategory.TECHNOLOGY;
-        if (Object.values(ContentCategory).includes(aiData.category as ContentCategory)) {
-            category = aiData.category as ContentCategory;
-        }
-
-        const newContent = this.contentRepository.create({
-            title: aiData.title,
-            summary: aiData.summary,
-            funFact: aiData.funFact,
-            estimatedReadingTimeSeconds: aiData.estimatedReadingTimeSeconds,
-            reelsEquivalent: aiData.reelsEquivalent,
-            tags: aiData.tags,
-            category,
-        });
-
-        return this.contentRepository.save(newContent);
+    private async generateAndSaveFromAI(topic: string): Promise<Content[]> {
+        return await this.geminiService.generateMicroLearningContent(topic);
     }
 }
