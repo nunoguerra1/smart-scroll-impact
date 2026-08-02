@@ -6,8 +6,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -66,7 +68,6 @@ export class AuthController {
     return user;
   }
 
-  // --- Google OAuth ---
   @Public()
   @Get('google')
   @UseGuards(AuthGuard('google'))
@@ -77,13 +78,18 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   @ApiOperation({ summary: 'Callback da autenticação do Google' })
-  async googleAuthCallback(@CurrentUser() googleUser: any) {
-    return this.authService.validateOAuthUser({
+  async googleAuthCallback(@CurrentUser() googleUser: any, @Res() res: Response) {
+    const { tokens } = await this.authService.validateOAuthUser({
       email: googleUser.email,
       name: googleUser.name,
       avatarUrl: googleUser.avatarUrl,
       googleId: googleUser.googleId,
     });
+
+    this.setAuthCookies(res, tokens);
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    return res.redirect(`${frontendUrl}/feed`);
   }
 
   @Public()
@@ -96,12 +102,35 @@ export class AuthController {
   @Get('github/callback')
   @UseGuards(AuthGuard('github'))
   @ApiOperation({ summary: 'Callback da autenticação do GitHub' })
-  async githubAuthCallback(@CurrentUser() githubUser: any) {
-    return this.authService.validateOAuthUser({
+  async githubAuthCallback(@CurrentUser() githubUser: any, @Res() res: Response) {
+    const { tokens } = await this.authService.validateOAuthUser({
       email: githubUser.email,
       name: githubUser.name,
       avatarUrl: githubUser.avatarUrl,
       githubId: githubUser.githubId,
+    });
+
+    this.setAuthCookies(res, tokens);
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    return res.redirect(`${frontendUrl}/feed`);
+  }
+
+  private setAuthCookies(res: Response, tokens: { accessToken: string, refreshToken: string }) {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    res.cookie('accessToken', tokens.accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
   }
 }
