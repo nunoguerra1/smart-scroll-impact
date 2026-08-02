@@ -89,7 +89,8 @@ export class AuthController {
     this.setAuthCookies(res, tokens);
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    return res.redirect(`${frontendUrl}/feed`);
+
+    return res.redirect(`${frontendUrl}/feed?token=${tokens.accessToken}`);
   }
 
   @Public()
@@ -113,7 +114,8 @@ export class AuthController {
     this.setAuthCookies(res, tokens);
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    return res.redirect(`${frontendUrl}/feed`);
+
+    return res.redirect(`${frontendUrl}/feed?token=${tokens.accessToken}`);
   }
 
   private setAuthCookies(res: Response, tokens: { accessToken: string, refreshToken: string }) {

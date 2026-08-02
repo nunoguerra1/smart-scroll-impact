@@ -28,16 +28,24 @@ export default function LoginPage() {
 
         try {
             const response = await api.post("/auth/login", { email, password });
-            const { accessToken } = response.data;
 
-            Cookies.set("smart_scroll_token", accessToken, {
+            const token = response.data.access_token || response.data.accessToken || response.data.token;
+
+            if (!token) {
+                throw new Error("Token não encontrado na resposta do servidor.");
+            }
+
+            Cookies.set("smart_scroll_token", token, {
                 expires: 7,
                 path: "/"
             });
+
+            localStorage.setItem("smart_scroll_token", token);
+
             window.location.href = "/feed";
         } catch (err: any) {
             setError(
-                err.response?.data?.message || "Credenciais inválidas. Tente novamente."
+                err.response?.data?.message || err.message || "Credenciais inválidas. Tente novamente."
             );
         } finally {
             setLoading(false);

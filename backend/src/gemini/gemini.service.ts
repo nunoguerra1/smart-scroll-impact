@@ -1,20 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import { GeminiMicroLearningContent } from './interfaces/gemini-content.interface';
 
 @Injectable()
 export class GeminiService {
     private readonly logger = new Logger(GeminiService.name);
-    private genAI: GoogleGenerativeAI | null = null;
+    private groq: Groq | null = null;
 
     constructor(private readonly configService: ConfigService) {
-        const apiKey = this.configService.get<string>('GEMINI_API_KEY');
+        const apiKey = this.configService.get<string>('GROQ_API_KEY');
         if (apiKey) {
-            this.genAI = new GoogleGenerativeAI(apiKey);
+            this.groq = new Groq({ apiKey });
         } else {
             this.logger.warn(
-                'GEMINI_API_KEY não encontrada. O serviço usará o gerador Fallback.',
+                'GROQ_API_KEY não encontrada. O serviço usará o gerador Fallback.',
             );
         }
     }
@@ -22,73 +22,43 @@ export class GeminiService {
     async generateMicroLearningContent(
         topic: string,
     ): Promise<GeminiMicroLearningContent> {
-        if (!this.genAI) {
+        if (!this.groq) {
             return this.getMockContent(topic);
         }
 
         try {
-            this.logger.log(`Gerando pílula de microaprendizado sobre: "${topic}"`);
+            this.logger.log(`Gerando pílula de microaprendizado sobre: "${topic}" via Groq (Llama 3.3 70B)`);
 
-            const model = this.genAI.getGenerativeModel({
-                model: 'gemini-1.5-flash',
-                generationConfig: {
-                    responseMimeType: 'application/json',
-                    responseSchema: {
-                        type: SchemaType.OBJECT,
-                        properties: {
-                            title: {
-                                type: SchemaType.STRING,
-                                description: 'Título direto e informativo sem clickbait.',
-                            },
-                            summary: {
-                                type: SchemaType.STRING,
-                                description: 'Resumo educativo de 30 a 45 segundos.',
-                            },
-                            funFact: {
-                                type: SchemaType.STRING,
-                                description: 'Curiosidade científica ou histórica impactante.',
-                            },
-                            estimatedReadingTimeSeconds: {
-                                type: SchemaType.NUMBER,
-                                description: 'Tempo estimado de leitura em segundos.',
-                            },
-                            reelsEquivalent: {
-                                type: SchemaType.NUMBER,
-                                description: 'Quantidade de reels economizados.',
-                            },
-                            tags: {
-                                type: SchemaType.ARRAY,
-                                items: { type: SchemaType.STRING },
-                                description: 'Tags de conceitos chave.',
-                            },
-                            category: {
-                                type: SchemaType.STRING,
-                                description: 'Categoria geral do conhecimento.',
-                            },
-                        },
-                        required: [
-                            'title',
-                            'summary',
-                            'funFact',
-                            'estimatedReadingTimeSeconds',
-                            'reelsEquivalent',
-                            'tags',
-                            'category',
-                        ],
+            const completion = await this.groq.chat.completions.create({
+                messages: [
+                    {
+                        role: 'system',
+                        content: `Você é uma IA educativa de ponta. Sua tarefa é gerar uma pílula de conhecimento diária sobre o tema solicitado.
+Você deve responder EXCLUSIVAMENTE em formato JSON válido, sem texto adicional, no seguinte formato:
+{
+  "title": "string (Título direto e informativo sem clickbait)",
+  "summary": "string (Resumo educativo de 30 a 45 segundos)",
+  "funFact": "string (Curiosidade científica ou histórica impactante)",
+  "estimatedReadingTimeSeconds": number (ex: 45),
+  "reelsEquivalent": number (ex: 6),
+  "tags": ["array", "de", "strings"],
+  "category": "string (Categoria geral)"
+}`,
                     },
-                },
+                    {
+                        role: 'user',
+                        content: `Gere uma pílula de conhecimento sobre o tema "${topic}".`,
+                    },
+                ],
+                model: 'llama-3.3-70b-versatile',
+                response_format: { type: 'json_object' },
             });
 
-            const prompt = `Gere uma pílula de conhecimento diária sobre o tema "${topic}". 
-      O conteúdo deve ser puramente educativo, livre de sensacionalismo ou títulos apelativos (clickbait), com linguagem clara e envolvente para combater o vício em dopamina rápida (doomscrolling).`;
-
-            const result = await model.generateContent(prompt);
-            const responseText = result.response.text();
-
+            const responseText = completion.choices[0]?.message?.content || '{}';
             return JSON.parse(responseText);
         } catch (error: any) {
             this.logger.warn(
-                `API do Gemini temporariamente indisponível (${error.message}). Ativando modo Fallback de desenvolvimento.`,
+                `API da Groq temporariamente indisponível (${error.message}). Ativando modo Fallback de desenvolvimento.`,
             );
             return this.getMockContent(topic);
         }

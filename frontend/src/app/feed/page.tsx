@@ -14,8 +14,12 @@ import {
     Clock,
     Zap,
     Hourglass,
+    Search,
+    Loader2
 } from "lucide-react";
 import { api } from "../../lib/api";
+import { useSearchParams, useRouter } from "next/navigation";
+import Cookies from "js-cookie";
 
 interface ContentItem {
     id: string;
@@ -32,6 +36,14 @@ export default function FeedPage() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [userStats, setUserStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+
+    const searchParams = useSearchParams();
+    const router = useRouter();
+
+    const [searchTopic, setSearchTopic] = useState("");
+    const [activeTopic, setActiveTopic] = useState("");
+    const [isGenerating, setIsGenerating] = useState(false);
+
     const [readCompleted, setReadCompleted] = useState<Record<string, boolean>>({});
     const [bookmarked, setBookmarked] = useState<Record<string, boolean>>({});
     const [direction, setDirection] = useState<"up" | "down">("down");
@@ -43,6 +55,17 @@ export default function FeedPage() {
     useEffect(() => {
         fetchInitialData();
     }, []);
+
+    useEffect(() => {
+        const tokenFromUrl = searchParams.get("token");
+
+        if (tokenFromUrl) {
+            localStorage.setItem("smart_scroll_token", tokenFromUrl);
+            Cookies.set("smart_scroll_token", tokenFromUrl, { expires: 7, path: "/" });
+
+            router.replace("/feed");
+        }
+    }, [searchParams, router]);
 
     useEffect(() => {
         setSecondsLeft(5);
@@ -62,41 +85,91 @@ export default function FeedPage() {
     }, [currentIndex]);
 
     const fetchInitialData = async () => {
+        setLoading(true);
+
         try {
-            try {
-                const feedRes = await api.get("/feed?limit=15");
-                if (feedRes.data?.items) {
-                    setItems(feedRes.data.items);
-                } else if (Array.isArray(feedRes.data)) {
-                    setItems(feedRes.data);
-                }
-            } catch (feedErr) {
-                console.error("⚠️ Erro ao carregar pílulas do Feed:", feedErr);
+            const statsRes = await api.get("/gamification/stats");
+            if (statsRes.data) {
+                setUserStats(statsRes.data);
             }
-
-            try {
-                const statsRes = await api.get("/gamification/stats");
-                if (statsRes.data) {
-                    setUserStats(statsRes.data);
-                }
-            } catch (statsErr) {
-                console.warn("⚠️ [Gamification] Erro ao carregar stats.");
-                setUserStats({ streakCount: 0, pointsBalance: 0, treesPlantedCount: 0 });
-            }
-
         } catch (err) {
-            console.error("Erro geral no carregamento do feed:", err);
+            console.error("Erro ao carregar estatísticas:", err);
+        }
+
+        try {
+            const feedRes = await api.get("/feed?limit=15");
+            if (feedRes.data?.items) {
+                setItems(feedRes.data.items);
+            } else if (Array.isArray(feedRes.data)) {
+                setItems(feedRes.data);
+            }
+        } catch (err) {
+            console.error("Erro no carregamento do feed:", err);
         } finally {
             setLoading(false);
         }
+    }
+
+    const handleGenerateAI = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!searchTopic.trim() || isGenerating) return;
+
+        setIsGenerating(true);
+        setActiveTopic(searchTopic);
+
+        setLoading(true);
+        try {
+            const res = await api.post("/gemini/generate", { topic: searchTopic });
+
+            if (res.data?.items) {
+                setItems(res.data.items);
+                setCurrentIndex(0);
+            }
+        } catch (err) {
+            console.error("Erro ao gerar conteúdo com IA:", err);
+        } finally {
+            setIsGenerating(false);
+            setLoading(false);
+        }
     };
+
+    const fetchMoreAI = useCallback(async () => {
+        if (isGenerating || !activeTopic) return;
+
+        setIsGenerating(true);
+        try {
+            const token = localStorage.getItem('token');
+
+            const res = await api.post(
+                "/gemini/generate",
+                { topic: activeTopic },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (res.data) {
+                setItems((prev) => [...prev, res.data]);
+            }
+        } catch (err) {
+            console.error("Erro no infinite scroll da IA:", err);
+        } finally {
+            setIsGenerating(false);
+        }
+    }, [activeTopic, isGenerating]);
 
     const handleNext = useCallback(() => {
         if (currentIndex < items.length - 1) {
             setDirection("down");
             setCurrentIndex((prev) => prev + 1);
+
+            if (currentIndex >= items.length - 3 && activeTopic) {
+                fetchMoreAI();
+            }
         }
-    }, [currentIndex, items.length]);
+    }, [currentIndex, items.length, activeTopic, fetchMoreAI]);
 
     const handlePrev = useCallback(() => {
         if (currentIndex > 0) {
@@ -107,6 +180,8 @@ export default function FeedPage() {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (document.activeElement?.tagName === "INPUT") return;
+
             if (e.key === "ArrowDown" || e.key === "PageDown") handleNext();
             if (e.key === "ArrowUp" || e.key === "PageUp") handlePrev();
         };
@@ -116,14 +191,10 @@ export default function FeedPage() {
 
     const handleMarkAsRead = async (contentId: string) => {
         if (readCompleted[contentId] || secondsLeft > 0) return;
-
         const elapsedSeconds = Math.floor((Date.now() - cardStartTimeRef.current) / 1000);
         const timeSpentSeconds = Math.max(5, elapsedSeconds);
 
-        const payload = {
-            contentId: String(contentId),
-            timeSpentSeconds,
-        };
+        const payload = { contentId: String(contentId), timeSpentSeconds };
 
         try {
             const res = await api.post("/gamification/read", payload);
@@ -140,17 +211,10 @@ export default function FeedPage() {
                 treesPlantedCount: Math.floor(((prev?.pointsBalance || 0) + earned) / 100),
             }));
         } catch (err) {
-            console.error("Erro ao registrar leitura:", err);
-
-            const fallbackPoints = 15;
             setReadCompleted((prev) => ({ ...prev, [contentId]: true }));
-            setPointsToast(fallbackPoints);
+            setPointsToast(15);
             setTimeout(() => setPointsToast(null), 3000);
-
-            setUserStats((prev: any) => ({
-                ...prev,
-                pointsBalance: (prev?.pointsBalance || 0) + fallbackPoints,
-            }));
+            setUserStats((prev: any) => ({ ...prev, pointsBalance: (prev?.pointsBalance || 0) + 15 }));
         }
     };
 
@@ -159,14 +223,13 @@ export default function FeedPage() {
             const res = await api.post(`/bookmarks/toggle/${contentId}`);
             setBookmarked((prev) => ({ ...prev, [contentId]: res.data?.bookmarked ?? !prev[contentId] }));
         } catch (err) {
-            console.error("Erro ao favoritar pílula:", err);
             setBookmarked((prev) => ({ ...prev, [contentId]: !prev[contentId] }));
         }
     };
 
     const currentItem = items[currentIndex];
 
-    if (loading) {
+    if (loading && !items.length) {
         return (
             <div className="min-h-screen bg-[#EBE6DF] flex flex-col items-center justify-center p-6 text-[#1A1A1A]">
                 <motion.div
@@ -175,7 +238,7 @@ export default function FeedPage() {
                     className="w-12 h-12 border-2 border-[#6A1A28] border-t-transparent rounded-full mb-6"
                 />
                 <p className="font-mono text-xs uppercase tracking-widest text-[#6A1A28] font-bold">
-                    CARREGANDO ACERVO DE CONHECIMENTO...
+                    GERANDO SEU ACERVO COM IA...
                 </p>
             </div>
         );
@@ -198,27 +261,49 @@ export default function FeedPage() {
                 )}
             </AnimatePresence>
 
-            <header className="max-w-xl mx-auto w-full bg-[#EBE6DF]/80 backdrop-blur-xl border border-[#1A1A1A]/15 p-3 sm:p-4 rounded-2xl shadow-sm flex items-center justify-between z-20">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-xs font-mono font-bold uppercase tracking-wider">
-                    <Flame className="w-4 h-4 text-amber-600 fill-amber-500" />
-                    <span>{userStats?.streakCount || 0} D</span>
-                </div>
+            <div className="max-w-xl mx-auto w-full z-20 space-y-4">
+                <header className="bg-[#EBE6DF]/80 backdrop-blur-xl border border-[#1A1A1A]/15 p-3 sm:p-4 rounded-2xl shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-xs font-mono font-bold uppercase tracking-wider">
+                        <Flame className="w-4 h-4 text-amber-600 fill-amber-500" />
+                        <span>{userStats?.streakCount || 0} D</span>
+                    </div>
 
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#6A1A28]/10 border border-[#6A1A28]/20 text-[#6A1A28] text-xs font-mono font-bold uppercase tracking-wider">
-                    <Award className="w-4 h-4" />
-                    <span>{userStats?.pointsBalance || 0} PTS</span>
-                </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#6A1A28]/10 border border-[#6A1A28]/20 text-[#6A1A28] text-xs font-mono font-bold uppercase tracking-wider">
+                        <Award className="w-4 h-4" />
+                        <span>{userStats?.pointsBalance || 0} PTS</span>
+                    </div>
 
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-600/10 border border-emerald-600/20 text-emerald-800 text-xs font-mono font-bold uppercase tracking-wider">
-                    <TreePine className="w-4 h-4 text-emerald-700" />
-                    <span>{userStats?.treesPlantedCount || 0} ÁRVO</span>
-                </div>
-            </header>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-600/10 border border-emerald-600/20 text-emerald-800 text-xs font-mono font-bold uppercase tracking-wider">
+                        <TreePine className="w-4 h-4 text-emerald-700" />
+                        <span>{userStats?.treesPlantedCount || 0} ÁRVO</span>
+                    </div>
+                </header>
+
+                <form onSubmit={handleGenerateAI} className="relative flex items-center">
+                    <div className="absolute left-4 text-[#1A1A1A]/40">
+                        {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Explore qualquer tema (Ex: Budismo, Buracos Negros...)"
+                        value={searchTopic}
+                        onChange={(e) => setSearchTopic(e.target.value)}
+                        className="w-full bg-white/60 border border-[#1A1A1A]/15 rounded-2xl py-4 pl-12 pr-24 font-sans font-medium text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:outline-none focus:ring-2 focus:ring-[#6A1A28]/20 focus:border-[#6A1A28]/30 transition-all shadow-sm"
+                        disabled={isGenerating}
+                    />
+                    <button
+                        type="submit"
+                        disabled={!searchTopic.trim() || isGenerating}
+                        className="absolute right-2 top-2 bottom-2 bg-[#1A1A1A] text-[#EBE6DF] px-4 rounded-xl text-xs font-mono font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-[#2A2A2A] transition-all"
+                    >
+                        Gerar
+                    </button>
+                </form>
+            </div>
 
             <main className="max-w-xl mx-auto w-full my-auto py-6 z-10 flex-1 flex flex-col justify-center">
                 {currentItem ? (
                     <div className="relative">
-
                         <div className="w-full bg-[#1A1A1A]/10 h-1 rounded-full mb-3 overflow-hidden">
                             <motion.div
                                 className="bg-[#6A1A28] h-full"
@@ -231,17 +316,9 @@ export default function FeedPage() {
                         <AnimatePresence mode="wait">
                             <motion.article
                                 key={currentItem.id}
-                                initial={{
-                                    opacity: 0,
-                                    y: direction === "down" ? 60 : -60,
-                                    scale: 0.95,
-                                }}
+                                initial={{ opacity: 0, y: direction === "down" ? 60 : -60, scale: 0.95 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{
-                                    opacity: 0,
-                                    y: direction === "down" ? -60 : 60,
-                                    scale: 0.95,
-                                }}
+                                exit={{ opacity: 0, y: direction === "down" ? -60 : 60, scale: 0.95 }}
                                 transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                                 className="bg-[#EBE6DF] border border-[#1A1A1A]/20 p-6 sm:p-8 rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.08)] relative flex flex-col justify-between min-h-[460px]"
                             >
@@ -267,7 +344,6 @@ export default function FeedPage() {
                                 </div>
 
                                 <div className="mt-8 pt-6 border-t border-[#1A1A1A]/10 space-y-4">
-
                                     <div className="flex items-center justify-between text-xs font-mono text-[#1A1A1A]/60 bg-[#1A1A1A]/5 p-3 rounded-2xl border border-[#1A1A1A]/10">
                                         <span className="flex items-center gap-2">
                                             <Zap className="w-4 h-4 text-amber-600" /> IMPACTO ESTIMADO
@@ -278,7 +354,6 @@ export default function FeedPage() {
                                     </div>
 
                                     <div className="flex items-center justify-between gap-3 pt-2">
-
                                         <button
                                             onClick={() => handleToggleBookmark(currentItem.id)}
                                             className={`p-4 rounded-2xl border transition-all duration-300 ${bookmarked[currentItem.id]
@@ -324,13 +399,27 @@ export default function FeedPage() {
                     </div>
                 ) : (
                     <div className="text-center py-20 border border-dashed border-[#1A1A1A]/20 rounded-3xl p-8">
-                        <Sparkles className="w-10 h-10 text-[#6A1A28] mx-auto mb-4" />
-                        <h3 className="text-xl font-black uppercase text-[#1A1A1A] mb-2">
-                            FIM DAS PÍLULAS POR HOJE
-                        </h3>
-                        <p className="text-sm font-sans text-[#1A1A1A]/70 max-w-sm mx-auto">
-                            Você consumiu todas as pílulas ativas. Volte mais tarde para expandir ainda mais seu repertório.
-                        </p>
+                        {isGenerating ? (
+                            <>
+                                <Loader2 className="w-10 h-10 animate-spin text-[#6A1A28] mx-auto mb-4" />
+                                <h3 className="text-xl font-black uppercase text-[#1A1A1A] mb-2">
+                                    GARIMPANDO {activeTopic}...
+                                </h3>
+                                <p className="text-sm font-sans text-[#1A1A1A]/70 max-w-sm mx-auto">
+                                    A IA está buscando vídeos, podcasts e curiosidades fresquinhas sobre este tema.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="w-10 h-10 text-[#6A1A28] mx-auto mb-4" />
+                                <h3 className="text-xl font-black uppercase text-[#1A1A1A] mb-2">
+                                    FIM DAS PÍLULAS
+                                </h3>
+                                <p className="text-sm font-sans text-[#1A1A1A]/70 max-w-sm mx-auto">
+                                    Use a barra de pesquisa acima para explorar novos assuntos ou volte mais tarde.
+                                </p>
+                            </>
+                        )}
                     </div>
                 )}
             </main>
@@ -344,8 +433,8 @@ export default function FeedPage() {
                     <ChevronUp className="w-4 h-4" /> ANTERIOR
                 </button>
 
-                <span className="font-mono text-xs font-bold text-[#1A1A1A]/40 tracking-widest">
-                    {items.length > 0 ? currentIndex + 1 : 0} // {items.length}
+                <span className="font-mono text-xs font-bold text-[#1A1A1A]/40 tracking-widest whitespace-nowrap">
+                    {items.length > 0 ? currentIndex + 1 : 0} // {isGenerating ? <Loader2 className="w-3 h-3 inline animate-spin" /> : items.length}
                 </span>
 
                 <button
