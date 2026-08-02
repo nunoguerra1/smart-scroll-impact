@@ -8,6 +8,7 @@ import { WaitlistModule } from './waitlist/waitlist.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { GeminiModule } from './gemini/gemini.module';
+import { ContentModule } from './content/content.module';
 
 @Module({
   imports: [
@@ -68,6 +69,8 @@ import { GeminiModule } from './gemini/gemini.module';
     AuthModule,
 
     GeminiModule,
+
+    ContentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
