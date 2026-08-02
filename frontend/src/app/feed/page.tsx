@@ -37,7 +37,6 @@ export default function FeedPage() {
     const [direction, setDirection] = useState<"up" | "down">("down");
     const [pointsToast, setPointsToast] = useState<number | null>(null);
 
-    // Estado do Cronômetro de 5 segundos para liberar a leitura
     const [secondsLeft, setSecondsLeft] = useState<number>(5);
     const cardStartTimeRef = useRef<number>(Date.now());
 
@@ -45,7 +44,6 @@ export default function FeedPage() {
         fetchInitialData();
     }, []);
 
-    // Timer de 5 segundos disparado toda vez que mudar de card
     useEffect(() => {
         setSecondsLeft(5);
         cardStartTimeRef.current = Date.now();
@@ -65,7 +63,6 @@ export default function FeedPage() {
 
     const fetchInitialData = async () => {
         try {
-            // 1. Busca pílulas do Feed
             try {
                 const feedRes = await api.get("/feed?limit=15");
                 if (feedRes.data?.items) {
@@ -77,7 +74,6 @@ export default function FeedPage() {
                 console.error("⚠️ Erro ao carregar pílulas do Feed:", feedErr);
             }
 
-            // 2. Busca stats de Gamificação
             try {
                 const statsRes = await api.get("/gamification/stats");
                 if (statsRes.data) {
@@ -131,27 +127,30 @@ export default function FeedPage() {
 
         try {
             const res = await api.post("/gamification/read", payload);
+            const earned = res.data?.pointsEarned || 15;
+
             setReadCompleted((prev) => ({ ...prev, [contentId]: true }));
+            setPointsToast(earned);
+            setTimeout(() => setPointsToast(null), 3000);
 
-            if (res.data?.pointsEarned) {
-                setPointsToast(res.data.pointsEarned);
-                setTimeout(() => setPointsToast(null), 3000);
-            }
-
-            if (res.data) {
-                setUserStats((prev: any) => ({
-                    ...prev,
-                    pointsBalance: res.data.totalPoints ?? res.data.pointsBalance ?? prev?.pointsBalance ?? 0,
-                    streakCount: res.data.streakCount ?? prev?.streakCount ?? 0,
-                    treesPlantedCount: res.data.treesPlantedCount ?? prev?.treesPlantedCount ?? 0,
-                }));
-            }
+            setUserStats((prev: any) => ({
+                ...prev,
+                pointsBalance: (prev?.pointsBalance || 0) + earned,
+                streakCount: res.data?.streakCount ?? (prev?.streakCount || 1),
+                treesPlantedCount: Math.floor(((prev?.pointsBalance || 0) + earned) / 100),
+            }));
         } catch (err) {
             console.error("Erro ao registrar leitura:", err);
-            // Fallback visual
+
+            const fallbackPoints = 15;
             setReadCompleted((prev) => ({ ...prev, [contentId]: true }));
-            setPointsToast(15);
+            setPointsToast(fallbackPoints);
             setTimeout(() => setPointsToast(null), 3000);
+
+            setUserStats((prev: any) => ({
+                ...prev,
+                pointsBalance: (prev?.pointsBalance || 0) + fallbackPoints,
+            }));
         }
     };
 
@@ -185,7 +184,6 @@ export default function FeedPage() {
     return (
         <div className="min-h-screen bg-[#EBE6DF] text-[#1A1A1A] flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden selection:bg-[#6A1A28] selection:text-[#EBE6DF]">
 
-            {/* Toast de Pontuação */}
             <AnimatePresence>
                 {pointsToast !== null && (
                     <motion.div
@@ -200,7 +198,6 @@ export default function FeedPage() {
                 )}
             </AnimatePresence>
 
-            {/* Cabeçalho */}
             <header className="max-w-xl mx-auto w-full bg-[#EBE6DF]/80 backdrop-blur-xl border border-[#1A1A1A]/15 p-3 sm:p-4 rounded-2xl shadow-sm flex items-center justify-between z-20">
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-xs font-mono font-bold uppercase tracking-wider">
                     <Flame className="w-4 h-4 text-amber-600 fill-amber-500" />
@@ -218,7 +215,6 @@ export default function FeedPage() {
                 </div>
             </header>
 
-            {/* Card Principal */}
             <main className="max-w-xl mx-auto w-full my-auto py-6 z-10 flex-1 flex flex-col justify-center">
                 {currentItem ? (
                     <div className="relative">
@@ -286,23 +282,22 @@ export default function FeedPage() {
                                         <button
                                             onClick={() => handleToggleBookmark(currentItem.id)}
                                             className={`p-4 rounded-2xl border transition-all duration-300 ${bookmarked[currentItem.id]
-                                                    ? "bg-[#6A1A28] text-[#EBE6DF] border-[#6A1A28]"
-                                                    : "bg-white/50 border-[#1A1A1A]/15 text-[#1A1A1A]/70 hover:bg-white hover:text-[#1A1A1A]"
+                                                ? "bg-[#6A1A28] text-[#EBE6DF] border-[#6A1A28]"
+                                                : "bg-white/50 border-[#1A1A1A]/15 text-[#1A1A1A]/70 hover:bg-white hover:text-[#1A1A1A]"
                                                 }`}
                                             title="Salvar na Biblioteca"
                                         >
                                             <Bookmark className="w-5 h-5 fill-current" />
                                         </button>
 
-                                        {/* Botão Dinâmico com Contador de 5 Segundos */}
                                         <button
                                             onClick={() => handleMarkAsRead(currentItem.id)}
                                             disabled={readCompleted[currentItem.id] || secondsLeft > 0}
                                             className={`flex-1 py-4 px-6 rounded-full font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all duration-300 ${readCompleted[currentItem.id]
-                                                    ? "bg-emerald-800 text-emerald-100 cursor-default"
-                                                    : secondsLeft > 0
-                                                        ? "bg-[#1A1A1A]/20 text-[#1A1A1A]/50 cursor-not-allowed border border-[#1A1A1A]/10"
-                                                        : "bg-[#6A1A28] text-[#EBE6DF] hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#6A1A28]/20"
+                                                ? "bg-emerald-800 text-emerald-100 cursor-default"
+                                                : secondsLeft > 0
+                                                    ? "bg-[#1A1A1A]/20 text-[#1A1A1A]/50 cursor-not-allowed border border-[#1A1A1A]/10"
+                                                    : "bg-[#6A1A28] text-[#EBE6DF] hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#6A1A28]/20"
                                                 }`}
                                         >
                                             {readCompleted[currentItem.id] ? (
@@ -340,7 +335,6 @@ export default function FeedPage() {
                 )}
             </main>
 
-            {/* Rodapé */}
             <footer className="max-w-xl mx-auto w-full z-20 flex items-center justify-between gap-4">
                 <button
                     onClick={handlePrev}
