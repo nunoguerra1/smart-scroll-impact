@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { WaitlistModule } from './waitlist/waitlist.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { GeminiModule } from './gemini/gemini.module';
 
 @Module({
   imports: [
@@ -39,6 +40,8 @@ import { AuthModule } from './auth/auth.module';
         GITHUB_CLIENT_ID: Joi.string().optional().allow(''),
         GITHUB_CLIENT_SECRET: Joi.string().optional().allow(''),
         GITHUB_CALLBACK_URL: Joi.string().default('http://localhost:3001/api/v1/auth/github/callback'),
+
+        GEMINI_API_KEY: Joi.string().optional().allow(''),
       }),
     }),
 
@@ -63,6 +66,8 @@ import { AuthModule } from './auth/auth.module';
     UsersModule,
 
     AuthModule,
+
+    GeminiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
