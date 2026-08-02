@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { GeminiModule } from './gemini/gemini.module';
 import { ContentModule } from './content/content.module';
 import { GamificationModule } from './gamification/gamification.module';
+import { BookmarksModule } from './bookmarks/bookmarks.module';
 
 @Module({
   imports: [
@@ -74,6 +75,8 @@ import { GamificationModule } from './gamification/gamification.module';
     ContentModule,
 
     GamificationModule,
+
+    BookmarksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
