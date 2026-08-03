@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { motion as motionComponent, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import {
     Flame,
     Award,
@@ -21,7 +22,8 @@ import {
     Lightbulb,
     ExternalLink,
     Play,
-    Bookmark
+    Bookmark,
+    LayoutDashboard,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -43,7 +45,7 @@ interface ContentItem {
     tags?: string[];
 }
 
-export default function FeedPage() {
+function FeedContent() {
     const [items, setItems] = useState<ContentItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [userStats, setUserStats] = useState<any>(null);
@@ -77,7 +79,8 @@ export default function FeedPage() {
             else if (item.tags.includes("microlearning")) detectedType = "microlearning";
         }
 
-        const finalType = item.type || detectedType;
+        let rawType = item.type === "noticias" ? "news" : item.type;
+        const finalType: ContentType = (rawType as ContentType) || (detectedType as ContentType);
         const query = encodeURIComponent(item.searchKeyword || item.title || item.topic || "");
 
         let embedUrl = item.embedUrl;
@@ -89,15 +92,16 @@ export default function FeedPage() {
         } else if (finalType === "podcast") {
             embedUrl = embedUrl || `https://www.youtube-nocookie.com/embed?listType=search&list=${query}%20podcast`;
             mediaUrl = mediaUrl || `https://open.spotify.com/search/${query}`;
-        } else if (finalType === "news" || finalType === "noticias") {
+        } else if (finalType === "news") {
             mediaUrl = mediaUrl || `https://news.google.com/search?q=${query}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
         }
 
         return {
             ...item,
+            id: item.id || `gen-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             type: finalType,
             embedUrl,
-            mediaUrl
+            mediaUrl,
         };
     };
 
@@ -164,7 +168,7 @@ export default function FeedPage() {
             const response = await api.post("/gemini/generate", {
                 topic: cleanTopic,
                 type: activeTab,
-                count: 3
+                count: 3,
             });
 
             const newCards = response.data;
@@ -190,7 +194,7 @@ export default function FeedPage() {
         try {
             const res = await api.post("/gamification/read", {
                 contentId: contentId,
-                timeSpentSeconds: Math.max(5, elapsedSeconds)
+                timeSpentSeconds: Math.max(5, elapsedSeconds),
             });
 
             const earned = res.data?.pointsEarned || 15;
@@ -198,12 +202,15 @@ export default function FeedPage() {
             setPointsToast(earned);
             setTimeout(() => setPointsToast(null), 3000);
 
-            setUserStats((prev: any) => ({
-                ...prev,
-                pointsBalance: res.data?.pointsBalance ?? ((prev?.pointsBalance || 0) + earned),
-                streakCount: res.data?.streakCount ?? (prev?.streakCount || 1),
-                treesPlantedCount: Math.floor(((prev?.pointsBalance || 0) + earned) / 100),
-            }));
+            setUserStats((prev: any) => {
+                const newPoints = res.data?.pointsBalance ?? ((prev?.pointsBalance || 0) + earned);
+                return {
+                    ...prev,
+                    pointsBalance: newPoints,
+                    streakCount: res.data?.streakCount ?? (prev?.streakCount || 1),
+                    treesPlantedCount: res.data?.treesPlantedCount ?? Math.floor(newPoints / 100),
+                };
+            });
         } catch (err) {
             console.error("Erro ao registrar leitura no servidor:", err);
         }
@@ -214,7 +221,7 @@ export default function FeedPage() {
 
         setBookmarkedItems((prev) => ({
             ...prev,
-            [contentId]: isBookmarking
+            [contentId]: isBookmarking,
         }));
 
         try {
@@ -227,7 +234,7 @@ export default function FeedPage() {
         } catch (error) {
             setBookmarkedItems((prev) => ({
                 ...prev,
-                [contentId]: !isBookmarking
+                [contentId]: !isBookmarking,
             }));
             console.error("Erro ao favoritar item:", error);
         }
@@ -238,7 +245,6 @@ export default function FeedPage() {
 
     return (
         <div className="min-h-screen bg-[#EBE6DF] text-[#1A1A1A] flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden">
-
             <AnimatePresence>
                 {pointsToast !== null && (
                     <motionComponent.div
@@ -268,21 +274,33 @@ export default function FeedPage() {
             </AnimatePresence>
 
             <div className="max-w-2xl mx-auto w-full z-20 space-y-4">
-                <header className="bg-[#EBE6DF]/80 backdrop-blur-xl border border-[#1A1A1A]/15 p-3 sm:p-4 rounded-2xl shadow-sm flex items-center justify-between">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-xs font-mono font-bold uppercase">
-                        <Flame className="w-4 h-4 text-amber-600 fill-amber-500" />
-                        <span>{userStats?.streakCount || 0} D</span>
+                <header className="bg-[#EBE6DF]/80 backdrop-blur-xl border border-[#1A1A1A]/15 p-3 sm:p-4 rounded-2xl shadow-sm flex items-center justify-between gap-2 overflow-x-auto">
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-xs font-mono font-bold uppercase">
+                            <Flame className="w-4 h-4 text-amber-600 fill-amber-500" />
+                            <span>{userStats?.streakCount || 0} D</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#6A1A28]/10 border border-[#6A1A28]/20 text-[#6A1A28] text-xs font-mono font-bold uppercase">
+                            <Award className="w-4 h-4" />
+                            <span>{userStats?.pointsBalance || 0} PTS</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-600/10 border border-emerald-600/20 text-emerald-800 text-xs font-mono font-bold uppercase">
+                            <TreePine className="w-4 h-4 text-emerald-700" />
+                            <span>{userStats?.treesPlantedCount || 0} ÁRVO</span>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#6A1A28]/10 border border-[#6A1A28]/20 text-[#6A1A28] text-xs font-mono font-bold uppercase">
-                        <Award className="w-4 h-4" />
-                        <span>{userStats?.pointsBalance || 0} PTS</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-600/10 border border-emerald-600/20 text-emerald-800 text-xs font-mono font-bold uppercase">
-                        <TreePine className="w-4 h-4 text-emerald-700" />
-                        <span>{userStats?.treesPlantedCount || 0} ÁRVO</span>
-                    </div>
+                    <Link
+                        href="/dashboard"
+                        prefetch={false}
+                        className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#1A1A1A] text-[#EBE6DF] hover:bg-[#6A1A28] text-xs font-mono font-bold uppercase transition-colors shrink-0 shadow-sm"
+                        title="Ir para o Dashboard"
+                    >
+                        <LayoutDashboard className="w-4 h-4" />
+                        <span className="hidden sm:inline">Dashboard</span>
+                    </Link>
                 </header>
 
                 <form onSubmit={handleGenerateAI} className="relative flex items-center">
@@ -291,7 +309,7 @@ export default function FeedPage() {
                     </div>
                     <input
                         type="text"
-                        placeholder={`Pesquisar ${activeTab === 'microlearning' ? 'pílula' : activeTab} com IA...`}
+                        placeholder={`Pesquisar ${activeTab === "microlearning" ? "pílula" : activeTab} com IA...`}
                         value={searchTopic}
                         onChange={(e) => setSearchTopic(e.target.value)}
                         className="w-full bg-white/70 border border-[#1A1A1A]/15 rounded-2xl py-3.5 pl-12 pr-24 font-sans font-medium text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:outline-none focus:ring-2 focus:ring-[#6A1A28]/20 transition-all shadow-sm text-sm"
@@ -308,32 +326,50 @@ export default function FeedPage() {
 
                 <div className="flex items-center justify-between gap-1 bg-white/40 p-1.5 rounded-2xl border border-[#1A1A1A]/10 text-xs font-mono font-bold">
                     <button
-                        onClick={() => { setActiveTab("microlearning"); setCurrentIndex(0); }}
-                        className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === "microlearning" ? "bg-[#6A1A28] text-white shadow-md" : "text-[#1A1A1A]/60 hover:text-[#1A1A1A]"}`}
+                        onClick={() => {
+                            setActiveTab("microlearning");
+                            setCurrentIndex(0);
+                        }}
+                        className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === "microlearning"
+                            ? "bg-[#6A1A28] text-white shadow-md"
+                            : "text-[#1A1A1A]/60 hover:text-[#1A1A1A]"
+                            }`}
                     >
                         <Lightbulb className="w-4 h-4" />
                         <span className="hidden sm:inline">PÍLULAS</span>
                     </button>
 
                     <button
-                        onClick={() => { setActiveTab("video"); setCurrentIndex(0); }}
-                        className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === "video" ? "bg-[#6A1A28] text-white shadow-md" : "text-[#1A1A1A]/60 hover:text-[#1A1A1A]"}`}
+                        onClick={() => {
+                            setActiveTab("video");
+                            setCurrentIndex(0);
+                        }}
+                        className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === "video" ? "bg-[#6A1A28] text-white shadow-md" : "text-[#1A1A1A]/60 hover:text-[#1A1A1A]"
+                            }`}
                     >
                         <Video className="w-4 h-4" />
                         <span className="hidden sm:inline">VÍDEOS</span>
                     </button>
 
                     <button
-                        onClick={() => { setActiveTab("podcast"); setCurrentIndex(0); }}
-                        className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === "podcast" ? "bg-[#6A1A28] text-white shadow-md" : "text-[#1A1A1A]/60 hover:text-[#1A1A1A]"}`}
+                        onClick={() => {
+                            setActiveTab("podcast");
+                            setCurrentIndex(0);
+                        }}
+                        className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === "podcast" ? "bg-[#6A1A28] text-white shadow-md" : "text-[#1A1A1A]/60 hover:text-[#1A1A1A]"
+                            }`}
                     >
                         <Headphones className="w-4 h-4" />
                         <span className="hidden sm:inline">PODCASTS</span>
                     </button>
 
                     <button
-                        onClick={() => { setActiveTab("news"); setCurrentIndex(0); }}
-                        className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === "news" ? "bg-[#6A1A28] text-white shadow-md" : "text-[#1A1A1A]/60 hover:text-[#1A1A1A]"}`}
+                        onClick={() => {
+                            setActiveTab("news");
+                            setCurrentIndex(0);
+                        }}
+                        className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === "news" ? "bg-[#6A1A28] text-white shadow-md" : "text-[#1A1A1A]/60 hover:text-[#1A1A1A]"
+                            }`}
                     >
                         <Newspaper className="w-4 h-4" />
                         <span className="hidden sm:inline">NOTÍCIAS</span>
@@ -420,7 +456,7 @@ export default function FeedPage() {
                                                         <span>Ouvir Podcast no Spotify / Fonte</span>
                                                     </>
                                                 )}
-                                                {(currentItem.type === "news" || (currentItem as any).type === "noticias") && (
+                                                {currentItem.type === "news" && (
                                                     <>
                                                         <Newspaper className="w-4 h-4 text-sky-300" />
                                                         <span>Ler Notícia Completa na Fonte</span>
@@ -507,7 +543,10 @@ export default function FeedPage() {
 
             <footer className="max-w-2xl mx-auto w-full z-20 flex items-center justify-between gap-4">
                 <button
-                    onClick={() => { setDirection("up"); setCurrentIndex(p => Math.max(0, p - 1)); }}
+                    onClick={() => {
+                        setDirection("up");
+                        setCurrentIndex((p) => Math.max(0, p - 1));
+                    }}
                     disabled={currentIndex === 0}
                     className="flex-1 py-3.5 rounded-2xl bg-white/60 border border-[#1A1A1A]/15 font-mono text-xs font-bold uppercase text-[#1A1A1A] flex items-center justify-center gap-2 disabled:opacity-30"
                 >
@@ -519,7 +558,10 @@ export default function FeedPage() {
                 </span>
 
                 <button
-                    onClick={() => { setDirection("down"); setCurrentIndex(p => Math.min(filteredItems.length - 1, p + 1)); }}
+                    onClick={() => {
+                        setDirection("down");
+                        setCurrentIndex((p) => Math.min(filteredItems.length - 1, p + 1));
+                    }}
                     disabled={currentIndex >= filteredItems.length - 1}
                     className="flex-1 py-3.5 rounded-2xl bg-[#1A1A1A] text-[#EBE6DF] font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 disabled:opacity-30"
                 >
@@ -527,5 +569,17 @@ export default function FeedPage() {
                 </button>
             </footer>
         </div>
+    );
+}
+
+export default function FeedPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-[#EBE6DF] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-[#6A1A28] animate-spin" />
+            </div>
+        }>
+            <FeedContent />
+        </Suspense>
     );
 }

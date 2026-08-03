@@ -28,14 +28,22 @@ export class GamificationService {
             throw new NotFoundException('Usuário não encontrado.');
         }
 
-        const content = await this.contentRepository.findOneBy({ id: dto.contentId });
-        if (!content) {
-            throw new NotFoundException('Conteúdo não encontrado.');
+        let reelsSaved = 3;
+        let contentFoundId = dto.contentId;
+
+        try {
+            const content = await this.contentRepository.findOneBy({ id: dto.contentId });
+            if (content) {
+                reelsSaved = content.reelsEquivalent || 3;
+                contentFoundId = content.id;
+            }
+        } catch (err) {
+            this.logger.warn(`Conteúdo "${dto.contentId}" é dinâmico/IA. Pontuando sem registro na tabela 'content'.`);
         }
 
         const now = new Date();
         const lastRead = user.lastReadAt ? new Date(user.lastReadAt) : null;
-        let newStreak = user.streakCount;
+        let newStreak = user.streakCount || 0;
 
         if (!lastRead) {
             newStreak = 1;
@@ -66,25 +74,25 @@ export class GamificationService {
         const streakBonus = Math.min(newStreak * 2, 20);
         const pointsEarned = basePoints + streakBonus;
 
-        user.pointsBalance += pointsEarned;
+        user.pointsBalance = (user.pointsBalance || 0) + pointsEarned;
         user.streakCount = newStreak;
         user.lastReadAt = now;
-
         user.treesPlantedCount = Math.floor(user.pointsBalance / 100);
 
         await this.userRepository.save(user);
 
         this.logger.log(
-            `Usuário ${user.email} completou leitura do conteúdo ${content.id}. +${pointsEarned} pts. Streak: ${user.streakCount}`,
+            `Usuário ${user.email} completou leitura do conteúdo ${contentFoundId} em ${dto.timeSpentSeconds}s. +${pointsEarned} pts. Streak: ${user.streakCount}`,
         );
 
         return {
             message: 'Leitura registrada com sucesso!',
             pointsEarned,
-            totalPoints: user.pointsBalance,
+            pointsBalance: user.pointsBalance,
             streakCount: user.streakCount,
             treesPlantedCount: user.treesPlantedCount,
-            reelsEquivalentSaved: content.reelsEquivalent,
+            reelsEquivalentSaved: reelsSaved,
+            timeSpentSeconds: dto.timeSpentSeconds,
         };
     }
 
@@ -96,14 +104,14 @@ export class GamificationService {
             throw new NotFoundException('Usuário não encontrado.');
         }
 
-        const estimatedReelsSaved = Math.floor(user.pointsBalance * 0.4);
+        const estimatedReelsSaved = Math.floor((user.pointsBalance || 0) * 0.4);
 
         return {
             userId: user.id,
             name: user.name,
-            pointsBalance: user.pointsBalance,
-            streakCount: user.streakCount,
-            treesPlantedCount: user.treesPlantedCount,
+            pointsBalance: user.pointsBalance || 0,
+            streakCount: user.streakCount || 0,
+            treesPlantedCount: user.treesPlantedCount || 0,
             estimatedReelsSaved,
             lastReadAt: user.lastReadAt,
         };
