@@ -20,7 +20,8 @@ import {
     Newspaper,
     Lightbulb,
     ExternalLink,
-    Play
+    Play,
+    Bookmark
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -57,8 +58,11 @@ export default function FeedPage() {
     const [isGenerating, setIsGenerating] = useState(false);
 
     const [readCompleted, setReadCompleted] = useState<Record<string, boolean>>({});
+    const [bookmarkedItems, setBookmarkedItems] = useState<Record<string, boolean>>({});
     const [direction, setDirection] = useState<"up" | "down">("down");
+
     const [pointsToast, setPointsToast] = useState<number | null>(null);
+    const [bookmarkToast, setBookmarkToast] = useState<string | null>(null);
 
     const [secondsLeft, setSecondsLeft] = useState<number>(5);
     const cardStartTimeRef = useRef<number>(Date.now());
@@ -74,7 +78,7 @@ export default function FeedPage() {
         }
 
         const finalType = item.type || detectedType;
-        const query = encodeURIComponent(item.title || item.topic || "");
+        const query = encodeURIComponent(item.searchKeyword || item.title || item.topic || "");
 
         let embedUrl = item.embedUrl;
         let mediaUrl = item.mediaUrl;
@@ -205,6 +209,30 @@ export default function FeedPage() {
         }
     };
 
+    const handleToggleBookmark = async (contentId: string) => {
+        const isBookmarking = !bookmarkedItems[contentId];
+
+        setBookmarkedItems((prev) => ({
+            ...prev,
+            [contentId]: isBookmarking
+        }));
+
+        try {
+            await api.post(`/bookmarks/toggle/${contentId}`, currentItem);
+
+            if (isBookmarking) {
+                setBookmarkToast("Conteúdo salvo na biblioteca!");
+                setTimeout(() => setBookmarkToast(null), 3000);
+            }
+        } catch (error) {
+            setBookmarkedItems((prev) => ({
+                ...prev,
+                [contentId]: !isBookmarking
+            }));
+            console.error("Erro ao favoritar item:", error);
+        }
+    };
+
     const filteredItems = items.filter((item) => item.type === activeTab);
     const currentItem = filteredItems[currentIndex];
 
@@ -221,6 +249,20 @@ export default function FeedPage() {
                     >
                         <Sparkles className="w-4 h-4 text-amber-300" />
                         <span>+{pointsToast} PONTOS ADQUIRIDOS!</span>
+                    </motionComponent.div>
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {bookmarkToast !== null && (
+                    <motionComponent.div
+                        initial={{ opacity: 0, y: 50, scale: 0.8 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -20, scale: 0.8 }}
+                        className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-emerald-800 text-emerald-100 px-6 py-3 rounded-full font-mono text-xs font-bold uppercase tracking-widest shadow-2xl flex items-center gap-2"
+                    >
+                        <Bookmark className="w-4 h-4 fill-current text-emerald-300" />
+                        <span>{bookmarkToast}</span>
                     </motionComponent.div>
                 )}
             </AnimatePresence>
@@ -313,14 +355,29 @@ export default function FeedPage() {
                             >
                                 <div>
                                     <div className="flex justify-between items-center mb-4">
-                                        <span className="px-3 py-1 rounded-full border border-[#1A1A1A]/10 bg-white/50 text-[#1A1A1A]/70 text-[10px] font-mono font-bold uppercase">
-                                            {currentItem.category || "Geral"}
-                                        </span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="px-3 py-1 rounded-full border border-[#1A1A1A]/10 bg-white/50 text-[#1A1A1A]/70 text-[10px] font-mono font-bold uppercase">
+                                                {currentItem.category || "Geral"}
+                                            </span>
 
-                                        <div className="flex items-center gap-1.5 text-xs font-mono text-[#1A1A1A]/60">
-                                            <Clock className="w-3.5 h-3.5 text-[#6A1A28]" />
-                                            <span>{currentItem.estimatedReadTime || 2} MIN</span>
+                                            <div className="flex items-center gap-1.5 text-xs font-mono text-[#1A1A1A]/60">
+                                                <Clock className="w-3.5 h-3.5 text-[#6A1A28]" />
+                                                <span>{currentItem.estimatedReadTime || 2} MIN</span>
+                                            </div>
                                         </div>
+
+                                        <button
+                                            onClick={() => handleToggleBookmark(currentItem.id)}
+                                            className="p-2 rounded-full bg-white/40 hover:bg-[#6A1A28]/10 transition-colors group"
+                                            title="Salvar na Biblioteca"
+                                        >
+                                            <Bookmark
+                                                className={`w-5 h-5 transition-all ${bookmarkedItems[currentItem.id]
+                                                    ? "fill-[#6A1A28] text-[#6A1A28]"
+                                                    : "text-[#1A1A1A]/40 group-hover:text-[#6A1A28]"
+                                                    }`}
+                                            />
+                                        </button>
                                     </div>
 
                                     <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-[#1A1A1A] leading-tight mb-3">
@@ -426,13 +483,24 @@ export default function FeedPage() {
                     </div>
                 ) : (
                     <div className="text-center py-16 border border-dashed border-[#1A1A1A]/20 rounded-3xl p-8 bg-white/20">
-                        <Sparkles className="w-10 h-10 text-[#6A1A28] mx-auto mb-3" />
-                        <h3 className="text-lg font-black uppercase text-[#1A1A1A] mb-1">
-                            NENHUM ITEM EM {activeTab.toUpperCase()}
-                        </h3>
-                        <p className="text-xs font-sans text-[#1A1A1A]/70 max-w-sm mx-auto mb-4">
-                            Digite um assunto na busca acima para gerar itens nesta categoria com a IA.
-                        </p>
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-10 h-10 text-[#6A1A28] mx-auto mb-3 animate-spin" />
+                                <h3 className="text-lg font-black uppercase text-[#1A1A1A] mb-1">
+                                    CARREGANDO FEED...
+                                </h3>
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="w-10 h-10 text-[#6A1A28] mx-auto mb-3" />
+                                <h3 className="text-lg font-black uppercase text-[#1A1A1A] mb-1">
+                                    NENHUM ITEM EM {activeTab.toUpperCase()}
+                                </h3>
+                                <p className="text-xs font-sans text-[#1A1A1A]/70 max-w-sm mx-auto mb-4">
+                                    Digite um assunto na busca acima para gerar itens nesta categoria com a IA.
+                                </p>
+                            </>
+                        )}
                     </div>
                 )}
             </main>

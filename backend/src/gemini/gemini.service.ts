@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Groq from 'groq-sdk';
 import { Content, ContentCategory } from '../content/entities/content.entity';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class GeminiService {
@@ -37,32 +38,11 @@ export class GeminiService {
             itemsData = [this.getMockContent(topic, selectedType)];
         } else {
             try {
-                this.logger.log(
-                    `Gerando ${count} item(ns) [Tipo: ${selectedType}] sobre: "${topic}" via Groq`,
-                );
+                this.logger.log(`Gerando ${count} item(ns) [Tipo: ${selectedType}] sobre: "${topic}" via Groq`);
 
                 const promptInstructions = `
-Você é um curador e produtor de conteúdo multimodal de alta retenção.
-Sua missão é gerar exatamente ${count} item(ns) de feed sobre o tema "${topic}".
-
-O usuário está navegando na aba do tipo: "${selectedType.toUpperCase()}".
-
-DIRETRIZES DE FORMATO POR TIPO:
-- Se MÍDIA for "VIDEO":
-  - "title": Título estilo YouTube/Reels chamativo (Ex: "▶️ 5 Minutos de Budismo que Vão Mudar sua Visão de Mundo").
-  - "summary": Descrição/Roteiro condensado do vídeo com destaques visuais do que é mostrado na tela.
-  - "funFact": "Canal recomendado: Ciência & Consciência • Assista em 4k"
-- Se MÍDIA for "PODCAST":
-  - "title": Título estilo Episódio de Podcast (Ex: "🎙️ EP #42 - A Neurociência por trás do Budismo").
-  - "summary": Principais tópicos debatidos no episódio entre o host e o convidado.
-  - "funFact": "Ouça no Spotify / Apple Podcasts"
-- Se MÍDIA for "NEWS" ou "NOTICIAS":
-  - "title": Manchete jornalística atualizada e impactante.
-  - "summary": Resumo factual dos acontecimentos e contexto sobre o tema.
-  - "funFact": "Fonte: Portais Globais de Notícias"
-- Se MÍDIA for "MICROLEARNING" ou "ARTICLE":
-  - "title": Título provocativo e direto.
-  - "summary": O fato ou pílula de conhecimento direto sem introduções clichês.
+Você é um curador e produtor de conteúdo.
+Gere exatamente ${count} item(ns) de feed sobre "${topic}" para a aba "${selectedType.toUpperCase()}".
 
 FORMATO OBRIGATÓRIO DA RESPOSTA (JSON):
 {
@@ -71,9 +51,10 @@ FORMATO OBRIGATÓRIO DA RESPOSTA (JSON):
       "title": "string",
       "summary": "string",
       "funFact": "string",
-      "estimatedReadingTimeSeconds": integer (número inteiro ex: 60),
-      "reelsEquivalent": integer (número INTEIRO obrigatório ex: 1, 2, 3. JAMAIS USE DECIMAIS COMO 0.5),
-      "tags": ["array", "de", "tags"],
+      "searchKeyword": "string (Termo de busca otimizado e exato, ex: 'Vídeo aula budismo completo' ou 'Podcast flow budismo')",
+      "estimatedReadingTimeSeconds": integer,
+      "reelsEquivalent": integer (JAMAIS USE DECIMAIS),
+      "tags": ["array"],
       "category": "string (DEVE SER UMA DESSAS: ${validCategories.join(', ')})"
     }
   ]
@@ -98,7 +79,7 @@ FORMATO OBRIGATÓRIO DA RESPOSTA (JSON):
             }
         }
 
-        const savedContents: Content[] = [];
+        const ephemeralContents: Content[] = [];
 
         for (const item of itemsData) {
             let safeCategory: ContentCategory;
@@ -112,43 +93,37 @@ FORMATO OBRIGATÓRIO DA RESPOSTA (JSON):
             tagsSet.add(selectedType);
             tagsSet.add(topic);
 
-            const rawReels = Math.round(Number(item.reelsEquivalent));
-            const safeReelsEquivalent = !isNaN(rawReels) && rawReels >= 1 ? rawReels : 3;
-
-            const rawReadingTime = Math.round(Number(item.estimatedReadingTimeSeconds));
-            const safeReadingTime = !isNaN(rawReadingTime) && rawReadingTime >= 1 ? rawReadingTime : 60;
-
-            const searchQuery = encodeURIComponent(item.title || topic);
+            const queryForLink = encodeURIComponent(item.searchKeyword || item.title || topic);
             let embedUrl: string | undefined = undefined;
             let mediaUrl: string | undefined = undefined;
 
             if (selectedType === 'video') {
-                embedUrl = `https://www.youtube-nocookie.com/embed?listType=search&list=${searchQuery}`;
-                mediaUrl = `https://www.youtube.com/results?search_query=${searchQuery}`;
+                embedUrl = `https://www.youtube-nocookie.com/embed?listType=search&list=${queryForLink}`;
+                mediaUrl = `https://www.youtube.com/results?search_query=${queryForLink}`;
             } else if (selectedType === 'podcast') {
-                embedUrl = `https://www.youtube-nocookie.com/embed?listType=search&list=${searchQuery}%20podcast`;
-                mediaUrl = `https://open.spotify.com/search/${searchQuery}`;
+                embedUrl = `https://www.youtube-nocookie.com/embed?listType=search&list=${queryForLink}%20podcast`;
+                mediaUrl = `https://open.spotify.com/search/${queryForLink}`;
             } else if (['news', 'noticias', 'notícia'].includes(selectedType)) {
-                mediaUrl = `https://news.google.com/search?q=${searchQuery}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
+                mediaUrl = `https://news.google.com/search?q=${queryForLink}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
             }
 
             const newContent = this.contentRepository.create({
+                id: randomUUID(),
                 title: item.title,
                 summary: item.summary,
                 funFact: item.funFact || item.summary,
                 category: safeCategory,
-                estimatedReadingTimeSeconds: safeReadingTime,
-                reelsEquivalent: safeReelsEquivalent,
+                estimatedReadingTimeSeconds: item.estimatedReadingTimeSeconds || 60,
+                reelsEquivalent: item.reelsEquivalent || 3,
                 tags: Array.from(tagsSet),
                 embedUrl,
                 mediaUrl,
             });
 
-            const saved = await this.contentRepository.save(newContent);
-            savedContents.push(saved);
+            ephemeralContents.push(newContent);
         }
 
-        return savedContents;
+        return ephemeralContents;
     }
 
     private getMockContent(topic: string, type: string) {

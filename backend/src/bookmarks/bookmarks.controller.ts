@@ -6,6 +6,7 @@ import {
     Query,
     UseGuards,
     ParseUUIDPipe,
+    Body,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { BookmarksService } from './bookmarks.service';
@@ -26,8 +27,9 @@ export class BookmarksController {
     async toggleBookmark(
         @CurrentUser('id') userId: string,
         @Param('contentId', ParseUUIDPipe) contentId: string,
+        @Body() contentData?: any,
     ) {
-        return this.bookmarksService.toggleBookmark(userId, contentId);
+        return this.bookmarksService.toggleBookmark(userId, contentId, contentData);
     }
 
     @Get()
