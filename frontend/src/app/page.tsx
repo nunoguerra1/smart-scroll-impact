@@ -4,6 +4,7 @@ import Hero from "./components/Hero";
 import Features from "./components/Features";
 import BentoGrid from "./components/BentoGrid";
 import Footer from "./components/Footer";
+import GlobalImpact from "./components/GlobalImpact";
 
 export default function Home() {
   return (
@@ -21,6 +22,10 @@ export default function Home() {
 
       <section id="lab">
         <BentoGrid />
+      </section>
+
+      <section id="impact">
+        <GlobalImpact />
       </section>
 
       <section id="footer">
