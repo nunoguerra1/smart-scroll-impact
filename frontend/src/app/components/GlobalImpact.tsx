@@ -29,9 +29,23 @@ export default function GlobalImpact() {
     useEffect(() => {
         const fetchGlobalStats = async () => {
             try {
-                const response = await api.get("/analytics/global");
-                if (response.data?.communityStats) {
-                    setStats(response.data.communityStats);
+                const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+
+                const response = await fetch(`${baseUrl}/analytics/global`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Erro na API: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data?.communityStats) {
+                    setStats(data.communityStats);
                 }
             } catch (error) {
                 console.error("Erro ao buscar status globais:", error);

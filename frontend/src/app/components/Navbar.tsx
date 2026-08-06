@@ -2,11 +2,13 @@
 
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
+import Link from "next/link"; // Importação adicionada
 
 export default function Navbar() {
     const pathname = usePathname();
 
-    if (["/login", "/register", "/feed"].includes(pathname)) {
+    // Se a rota não for a raiz (Landing Page), a Navbar não renderiza
+    if (pathname !== "/") {
         return null;
     }
 
@@ -48,14 +50,20 @@ export default function Navbar() {
                     >
                         The Lab
                     </button>
+                    <button
+                        onClick={() => scrollTo("impact")}
+                        className="hover:opacity-50 transition-opacity cursor-pointer focus:outline-none"
+                    >
+                        Impacto
+                    </button>
                 </div>
 
-                <button
-                    onClick={() => scrollTo("footer")}
+                <Link
+                    href="/login"
                     className="text-sm font-bold uppercase tracking-widest border-b border-current pb-1 hover:opacity-50 transition-opacity cursor-pointer focus:outline-none"
                 >
                     Entrar
-                </button>
+                </Link>
             </nav>
         </motion.header>
     );
