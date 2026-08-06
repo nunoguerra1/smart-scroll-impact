@@ -14,20 +14,20 @@ export default function Hero() {
 
     const smoothProgress = useSpring(scrollYProgress, { stiffness: 70, damping: 20, mass: 0.5 });
 
-    const scaleQuebre = useTransform(smoothProgress, [0, 0.2], [1, 0.6]);
-    const opacityQuebre = useTransform(smoothProgress, [0, 0.2], [1, 0]);
-    const yQuebre = useTransform(smoothProgress, [0, 0.2], [0, -100]);
+    const scaleQuebre = useTransform(smoothProgress, [0, 0.4], [1, 0.6]);
+    const opacityQuebre = useTransform(smoothProgress, [0, 0.4], [1, 0]);
+    const yQuebre = useTransform(smoothProgress, [0, 0.4], [0, -100]);
 
-    const scaleCiclo = useTransform(smoothProgress, [0, 0.3], [1, 15]);
-    const opacityCiclo = useTransform(smoothProgress, [0.15, 0.25], [1, 0]);
+    const scaleCiclo = useTransform(smoothProgress, [0, 0.5], [1, 15]);
+    const opacityCiclo = useTransform(smoothProgress, [0.2, 0.4], [1, 0]);
 
-    const rotateXManifesto = useTransform(smoothProgress, [0.2, 0.4], [60, 0]);
-    const yManifesto = useTransform(smoothProgress, [0.2, 0.4], [300, 0]);
-    const opacityManifesto = useTransform(smoothProgress, [0.2, 0.35], [0, 1]);
-    const scaleManifesto = useTransform(smoothProgress, [0.2, 0.4], [0.8, 1]);
+    const rotateXManifesto = useTransform(smoothProgress, [0.4, 0.8], [60, 0]);
+    const yManifesto = useTransform(smoothProgress, [0.4, 0.8], [300, 0]);
+    const opacityManifesto = useTransform(smoothProgress, [0.4, 0.7], [0, 1]);
+    const scaleManifesto = useTransform(smoothProgress, [0.4, 0.8], [0.8, 1]);
 
     return (
-        <section ref={containerRef} className="relative h-[400vh] w-full">
+        <section ref={containerRef} className="relative h-[200vh] w-full">
             <div className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden" style={{ perspective: "1000px" }}>
 
                 <motion.div style={{ scale: scaleQuebre, opacity: opacityQuebre, y: yQuebre }} className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
