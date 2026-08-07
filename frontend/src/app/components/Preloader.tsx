@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function Preloader() {
     const [loading, setLoading] = useState(true);
     const [counter, setCounter] = useState(0);
-    const customEase = [0.76, 0, 0.24, 1];
+
+    const customEase = [0.76, 0, 0.24, 1] as const;
 
     useEffect(() => {
         let count = 0;

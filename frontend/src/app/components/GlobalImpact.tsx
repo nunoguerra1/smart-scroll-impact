@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion, useInView, animate, useMotionValue, useMotionTemplate, useScroll, useTransform } from "framer-motion";
+import { motion, useInView, animate, useMotionValue, useMotionTemplate, useScroll, useTransform, Variants } from "framer-motion";
 import { Users, Smartphone, Clock, BookOpen, TreePine, Globe } from "lucide-react";
 
 interface CommunityStats {
@@ -110,7 +110,7 @@ export default function GlobalImpact() {
         fetchGlobalStats();
     }, []);
 
-    const containerVariants = {
+    const containerVariants: Variants = {
         hidden: { opacity: 0 },
         visible: {
             opacity: 1,
@@ -118,7 +118,7 @@ export default function GlobalImpact() {
         }
     };
 
-    const itemVariants = {
+    const itemVariants: Variants = {
         hidden: { opacity: 0, y: 80, rotateX: 15, scale: 0.9 },
         visible: {
             opacity: 1,
