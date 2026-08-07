@@ -30,12 +30,15 @@ export default function BentoGrid() {
     useEffect(() => {
         const fetchFeed = async () => {
             try {
-                const response = await fetch('/api/v1/content/feed');
+                const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://impact-scroll-backend.onrender.com';
+
+                const response = await fetch(`${API_URL}/api/v1/content/feed`);
                 if (!response.ok) throw new Error("Erro na rede");
 
                 const data = await response.json();
 
-                const shuffledItems = data.items.sort(() => 0.5 - Math.random());
+                const items = data.items || data || [];
+                const shuffledItems = [...items].sort(() => 0.5 - Math.random());
 
                 setCards(shuffledItems.slice(0, 6));
             } catch (error) {
