@@ -3,17 +3,16 @@ import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
     let token = request.cookies.get("smart_scroll_token")?.value;
-
     const tokenFromUrl = request.nextUrl.searchParams.get("token");
 
     if (!token && tokenFromUrl) {
         token = tokenFromUrl;
     }
 
-    const isAuthPage = request.nextUrl.pathname.startsWith("/login");
-    const isProtectedPage =
-        request.nextUrl.pathname.startsWith("/dashboard") ||
-        request.nextUrl.pathname.startsWith("/feed");
+    const pathname = request.nextUrl.pathname;
+
+    const isAuthPage = pathname.startsWith("/login");
+    const isProtectedPage = pathname.startsWith("/dashboard") || pathname.startsWith("/feed");
 
     if (isProtectedPage && !token) {
         return NextResponse.redirect(new URL("/login", request.url));
@@ -37,5 +36,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ["/dashboard/:path*", "/feed/:path*", "/login"],
+    matcher: [
+        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    ],
 };

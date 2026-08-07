@@ -1,13 +1,67 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { MoveRight } from "lucide-react";
+import { MoveRight, Loader2 } from "lucide-react";
+import { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function Footer() {
+    const [email, setEmail] = useState("");
+    const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
+
     const scrollTo = (id: string) => {
         const element = document.getElementById(id);
         if (element) {
             element.scrollIntoView({ behavior: "smooth" });
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!email) return;
+
+        setStatus("loading");
+
+        try {
+            const response = await fetch("/api/v1/waitlist", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ email }),
+            });
+
+            if (!response.ok) {
+                throw new Error("Falha ao se inscrever na waitlist");
+            }
+
+            setStatus("success");
+            toast.success("Inscrição confirmada! Fique de olho no seu e-mail.", {
+                style: {
+                    background: '#121212',
+                    color: '#EBE6DF',
+                    border: '1px solid #2A2A2A',
+                },
+                iconTheme: {
+                    primary: '#6A1A28',
+                    secondary: '#EBE6DF',
+                },
+            });
+
+            setEmail("");
+
+            setTimeout(() => setStatus("idle"), 3000);
+
+        } catch (error) {
+            setStatus("idle");
+            toast.error("Ocorreu um erro ao tentar se inscrever. Tente novamente.", {
+                style: {
+                    background: '#121212',
+                    color: '#EBE6DF',
+                    border: '1px solid #2A2A2A',
+                }
+            });
         }
     };
 
@@ -30,27 +84,41 @@ export default function Footer() {
                     </p>
                 </motion.div>
 
-                <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        alert("Inscrição confirmada no ImpactScroll!");
-                    }}
-                    className="w-full max-w-xl flex flex-col md:flex-row gap-3 mb-24"
-                >
-                    <input
-                        type="email"
-                        placeholder="Seu melhor e-mail..."
-                        required
-                        className="flex-1 bg-[#121212] border border-[#2A2A2A] rounded-full py-4 px-6 text-[#EBE6DF] placeholder:text-[#EBE6DF]/30 focus:outline-none focus:border-[#6A1A28] font-mono text-sm"
-                    />
-                    <button
-                        type="submit"
-                        className="px-8 py-4 bg-[#EBE6DF] text-[#0A0A0A] font-bold uppercase tracking-widest text-xs rounded-full hover:bg-[#6A1A28] hover:text-[#EBE6DF] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                <div className="w-full max-w-xl mb-24">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="w-full flex flex-col md:flex-row gap-3 relative"
                     >
-                        <span>Entrar na Lista</span>
-                        <MoveRight className="w-4 h-4" />
-                    </button>
-                </form>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="Seu melhor e-mail..."
+                            required
+                            disabled={status === "loading"}
+                            className="flex-1 bg-[#121212] border border-[#2A2A2A] rounded-full py-4 px-6 text-[#EBE6DF] placeholder:text-[#EBE6DF]/30 focus:outline-none focus:border-[#6A1A28] font-mono text-sm disabled:opacity-50 transition-colors"
+                        />
+                        <button
+                            type="submit"
+                            disabled={status === "loading" || status === "success"}
+                            className="px-8 py-4 bg-[#EBE6DF] text-[#0A0A0A] font-bold uppercase tracking-widest text-xs rounded-full hover:bg-[#6A1A28] hover:text-[#EBE6DF] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed min-w-[200px]"
+                        >
+                            {status === "loading" ? (
+                                <>
+                                    <span>Enviando</span>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                </>
+                            ) : status === "success" ? (
+                                <span>Inscrito!</span>
+                            ) : (
+                                <>
+                                    <span>Entrar na Lista</span>
+                                    <MoveRight className="w-4 h-4" />
+                                </>
+                            )}
+                        </button>
+                    </form>
+                </div>
 
                 <div className="w-full flex flex-col md:flex-row justify-between items-center pt-8 border-t border-[#1A1A1A] text-[#EBE6DF]/40 text-xs font-mono uppercase tracking-widest gap-4">
                     <div className="flex items-center gap-2">

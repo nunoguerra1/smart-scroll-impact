@@ -4,8 +4,9 @@ import { useRef, Suspense } from "react";
 import { motion, useScroll } from "framer-motion";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Float, useGLTF } from "@react-three/drei";
-import { Brain, Globe, Sparkles, BookOpen } from "lucide-react";
+import { Brain, Sparkles, BookOpen } from "lucide-react";
 import * as THREE from "three";
+import Link from "next/link";
 
 function DownloadedModel({ scrollProgress }: { scrollProgress: any }) {
     const { scene } = useGLTF('/telefone.glb');
@@ -99,10 +100,12 @@ export default function Features() {
                         <BookOpen className="w-10 h-10" />
                     </div>
                     <h3 className="text-5xl md:text-6xl font-black uppercase tracking-tight text-[#EBE6DF] mb-6 pointer-events-auto">Expansão Cognitiva</h3>
-                    <button className="pointer-events-auto group relative px-12 py-6 bg-[#6A1A28] text-[#EBE6DF] overflow-hidden rounded-full font-bold uppercase tracking-widest text-sm flex items-center gap-6 hover:scale-105 transition-transform duration-500">
+
+                    <Link href="/feed" prefetch={false} className="pointer-events-auto group relative px-12 py-6 bg-[#6A1A28] text-[#EBE6DF] overflow-hidden rounded-full font-bold uppercase tracking-widest text-sm flex items-center gap-6 hover:scale-105 transition-transform duration-500">
                         <span className="relative z-10 flex items-center gap-3">Começar a Ler Agora</span>
                         <div className="absolute inset-0 bg-[#EBE6DF] text-[#0A0A0A] translate-y-[100%] group-hover:translate-y-0 transition-transform duration-500 ease-[0.76,0,0.24,1] z-0"></div>
-                    </button>
+                    </Link>
+
                 </section>
 
             </div>
